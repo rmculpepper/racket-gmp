@@ -1,93 +1,40 @@
 #lang racket/base
-(require ffi/unsafe)
+(require ffi/unsafe
+         ffi/unsafe/atomic
+         "private/unsafe.rkt")
 (provide (all-defined-out)
          mpz?
          mpq?)
 
-;; ------------------------------------------------------------
-(module unsafe racket/base
-  (require (for-syntax racket/base racket/syntax)
-           ffi/unsafe
-           ffi/unsafe/define
-           ffi/unsafe/alloc)
-  (provide (protect-out (all-defined-out)))
-
-  (define-ffi-definer define-gmp0 (ffi-lib "libgmp" '(#f "10"))
-    #:default-make-fail make-not-available)
-
-  (define-syntax (define-gmp stx)
-    (syntax-case stx ()
-      [(define-gmp name type option ...)
-       (with-syntax ([cname (format-id #'name "__g~a" #'name)])
-         #'(define-gmp0 name type #:c-id cname option ...))]))
-
-  (define-cstruct _mpz_struct
-    ([mp_alloc _int]
-     [mp_size  _int]
-     [mp_d     _pointer]))
-
-  (define-cstruct _mpq_struct
-    ([mp_num   _mpz_struct]
-     [mp_den   _mpz_struct]))
-
-  (define-cpointer-type _mpz)
-  (define-cpointer-type _mpq)
-
-  ;; ---- Unsafe mpz functions ----
-
-  (define-gmp mpz_clear
-    (_fun _mpz -> _void)
-    #:wrap (deallocator))
-
-  (define-gmp mpz_init_set_ui
-    (_fun (z value) :: (z : _mpz) (value : _ulong) -> _void -> z)
-    #:wrap (allocator mpz_clear))
-
-  (define-gmp mpz_get_str (_fun _pointer _int _mpz -> _pointer))
-
-  (define-gmp mpz_import
-    (_fun _mpz _size _int _size _int _size _pointer -> _void))
-
-  (define-gmp mpz_export
-    (_fun _pointer (count : (_ptr o _size)) _int _size _int _size _mpz -> _pointer -> count))
-
-  )
-
-;; ------------------------------------------------------------
-(module internal racket/base
-  (require (submod ".." unsafe)
-           ffi/unsafe)
-  (provide (all-defined-out))
-
-  (define mpz-size (ctype-sizeof _mpz_struct))
-  (define mpq-size (ctype-sizeof _mpq_struct))
-
-  (define _mp_bitcnt _ulong)
-
-  (define (alloc-mpz) (cast (malloc mpz-size 'atomic-interior) _pointer _mpz))
-  (define (alloc-mpq) (cast (malloc mpq-size 'atomic-interior) _pointer _mpq)))
-
-;; ----------------------------------------
-(require 'unsafe 'internal)
-
 ;; ============================================================
+;; mpz
 
 (define (mpz [n 0])
-  (unless (exact-integer? n)
+  (unless (or (exact-integer? n) (mpz? n))
     (raise-argument-error 'mpz "exact-integer?" 0 n))
   (define z (alloc-mpz))
-  (mpz_init_set_ui z 0)
+  (mpz_init z)
+  (cond [(exact-integer? n)
+         (mpz-set! z n)]
+        [(mpz? n)
+         (mpz_set z n)])
+  z)
+
+(define (mpz-set! z n)
+  (unless (mpz? z)
+    (raise-argument-error 'mpz-set! "mpz?" 0 z n))
+  (unless (exact-integer? n)
+    (raise-argument-error 'mpz-set! "exact-integer?" 1 z n))
   (define absn (abs n))
   (for ([i (in-range (integer-length absn))])
     (when (bitwise-bit-set? absn i) (mpz_setbit z i)))
-  (when (negative? n) (mpz_neg z z))
-  z)
+  (when (negative? n) (mpz_neg z z)))
 
 (define (mpz->string z [base 10])
   (unless (mpz? z)
     (raise-argument-error 'mpz->string "mpz?" 0 z base))
-  (unless (and (fixnum? base) (<= 2 base 62))
-    (raise-argument-error 'mpz->string "(integer-in 2 62)" 1 z base))
+  (unless (memv base '(2 8 10 16))
+    (raise-argument-error 'mpz->string "(or/c 2 8 10 16)" 1 z base))
   (define buf (make-bytes (+ (mpz_sizeinbase z base) (if (= (mpz_sgn z) -1) 1 0))))
   (mpz_get_str buf base z)
   (bytes->string/latin-1 buf))
@@ -98,7 +45,11 @@
   ;; FIXME!!!
   (string->number (mpz->string z 16) 16))
 
-;; ============================================================
+(define (mpz-zero? z)
+  (unless (mpz? z) (raise-argument-error 'mpz-zero? "mpz?" 0 z))
+  (zero? (mpz_sgn z)))
+
+;; ------------------------------------------------------------
 ;; Safe mpz Functions
 
 ;; ----------------------------------------
@@ -271,6 +222,7 @@
 
 ;; mpz_sgn (macro)
 (define (mpz_sgn z)
+  (unless (mpz? z) (raise-argument-error 'mpz_sgn "mpz?" 0 z))
   (define zsize (mpz_struct-mp_size (cast z _mpz _mpz_struct-pointer)))
   (cond [(= zsize 0) 0] [(> zsize 0) 1] [else -1]))
 
@@ -293,9 +245,6 @@
 (define-gmp mpz_combit      (_fun _mpz _mp_bitcnt -> _void))
 
 (define-gmp mpz_tstbit      (_fun _mpz _mp_bitcnt -> _int))
-
-;; ----------------------------------------
-;; Input and Output
 
 ;; ----------------------------------------
 ;; Random Numbers
@@ -322,4 +271,115 @@
 (define-gmp mpz_sizeinbase      (_fun _mpz _int -> _size))
 
 ;; ============================================================
+;; mpq
+
+(define (mpq [x 0])
+  (unless (or (and (rational? x) (exact? x)) (mpz? q) (mpq? q))
+    (raise-argument-error 'mpq "(or/c (and/c rational? exact?) mpz? mpq?)" 0 x))
+  (define q (alloc-mpq))
+  (mpq_init q)
+  (cond [(rational? x)
+         (define n (numerator x))
+         (define d (denominator x))
+         (cond [(and (fixnum? n) (fixnum? d))
+                (mpq_set_si q n d)]
+               [else
+                (mpz-set! (mpq_numref q) n)
+                (mpz-set! (mpq_denref q) d)])]
+        [(mpz? x)
+         (mpz_set (mpq_numref q) x)]
+        [(mpq? x)
+         (mpq_set q x)])
+  q)
+
+(define (mpq->string q)
+  (unless (mpq? q) (raise-argument-error 'mpq->string "mpq?" 0 q))
+  (format "~a/~a" (mpz->string (mpq_numref q)) (mpz->string (mpq_denref q))))
+
+(define (mpq->number q)
+  (unless (mpq? q) (raise-argument-error 'mpq->number "mpq?" 0 q))
+  (/ (mpz->number (mpq_numref q)) (mpz->number (mpq_denref q))))
+
+(define (mpq-zero? q)
+  (unless (mpq? q) (raise-argument-error 'mpq-zero? "mpq?" 0 q))
+  (zero? (mpq_sgn q)))
+
+;; ------------------------------------------------------------
 ;; Safe mpq Functions
+
+(define-gmp mpq_canonicalize (_fun _mpq -> _void))
+
+;; ----------------------------------------
+;; Assignment
+
+(define-gmp mpq_set     (_fun _mpq _mpq -> _void))
+(define-gmp mpq_set_z   (_fun _mpq _mpz -> _void))
+(define-gmp mpq_set_ui  (_fun _mpq _ulong _ulong -> _void)) ;; FIXME: canonicalize
+(define-gmp mpq_set_si  (_fun _mpq _long _ulong -> _void))  ;; FIXME: canonicalize
+;; mpq_set_str
+(define-gmp mpq_swap    (_fun _mpq _mpq -> _void))
+
+;; ----------------------------------------
+;; Conversion
+
+(define-gmp mpq_get_d   (_fun _mpq -> _double))
+(define-gmp mpq_set_d   (_fun _mpq _double* -> _void))
+;; mpq_set_f
+;; mpq_get_str
+
+;; ----------------------------------------
+;; Arithmetic
+
+(define-gmp mpq_add     (_fun _mpq _mpq _mpq -> _void))
+(define-gmp mpq_sub     (_fun _mpq _mpq _mpq -> _void))
+(define-gmp mpq_mul     (_fun _mpq _mpq _mpq -> _void))
+(define-gmp mpq_mul_2exp (_fun _mpq _mpq _mp_bitcnt -> _void))
+(define-gmp mpq_div     (_fun _mpq _mpq _mpq -> _void)
+  #:wrap (lambda (f) (lambda (dst a b)
+                       (call-as-atomic
+                        (lambda ()
+                          (when (and (mpq? b) (mpq-zero? b))
+                            (error 'mpq_div "division by zero"))
+                          (f dst a b))))))
+(define-gmp mpq_div_2exp (_fun _mpq _mpq _mp_bitcnt -> _void))
+(define-gmp mpq_neg     (_fun _mpq _mpq -> _void))
+(define-gmp mpq_abs     (_fun _mpq _mpq -> _void))
+(define-gmp mpq_inv     (_fun _mpq _mpq -> _void)
+  #:wrap (lambda (f) (lambda (dst src)
+                       (call-as-atomic
+                        (lambda ()
+                          (when (and (mpq? src) (mpq-zero? src))
+                            (error 'mpq_inv "division by zero"))
+                          (f dst src))))))
+
+;; ----------------------------------------
+;; Comparison
+
+(define-gmp mpq_cmp     (_fun _mpq _mpq -> _int))
+(define-gmp mpq_cmp_z   (_fun _mpq _mpz -> _int))
+
+(define-gmp mpq_cmp_ui  (_fun _mpq _ulong _ulong -> _int))
+(define-gmp mpq_cmp_si  (_fun _mpq _long  _ulong -> _int))
+
+(define (mpq_sgn q)
+  (unless (mpq? q) (raise-argument-error 'mpq_sgn "mpq?" 0 q))
+  (define zsize (mpz_struct-mp_size (mpq_struct-mp_num (cast q _mpq _mpq_struct-pointer))))
+  (cond [(= zsize 0) 0] [(> zsize 0) 1] [else -1]))
+
+(define-gmp mpq_equal   (_fun _mpq _mpq -> _bool))
+
+;; ----------------------------------------
+;; Applying Integer Functions to Rationals
+
+(define (mpq_numref q)
+  (unless (mpq? q) (raise-argument-error 'mpq_numref "mpq?" 0 q))
+  (cast (mpq_struct-mp_num (cast q _mpq _mpq_struct-pointer)) _mpz_struct-pointer _mpz))
+
+(define (mpq_denref q)
+  (unless (mpq? q) (raise-argument-error 'mpq_denref "mpq?" 0 q))
+  (cast (mpq_struct-mp_den (cast q _mpq _mpq_struct-pointer)) _mpz_struct-pointer _mpz))
+
+(define-gmp mpq_get_num (_fun _mpz _mpq -> _void))
+(define-gmp mpq_get_den (_fun _mpz _mpq -> _void))
+(define-gmp mpq_set_num (_fun _mpq _mpz -> _void)) ;; FIXME: canonicalize?
+(define-gmp mpq_set_den (_fun _mpq _mpz -> _void)) ;; FIXME: canonicalize?
