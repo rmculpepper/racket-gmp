@@ -4,7 +4,9 @@
          "private/unsafe.rkt")
 (provide (all-defined-out)
          mpz?
-         mpq?)
+         mpq?
+         mpz_sizeinbase
+         mpz_size)
 
 ;; ============================================================
 ;; mpz
@@ -61,7 +63,7 @@
 (define-gmp mpz_set_d   (_fun _mpz _double* -> _void))
 (define-gmp mpz_set_q   (_fun _mpz _mpq -> _void))
 ;; mpz_set_f
-(define-gmp mpz_set_str (_fun _mpz _string _int -> _void))
+(define-gmp mpz_set_str (_fun _mpz _string/latin-1 _int -> _int))
 (define-gmp mpz_swap    (_fun _mpz _mpz -> _void))
 
 ;; ----------------------------------------
@@ -103,6 +105,7 @@
 ;; ----------------------------------------
 ;; Division
 
+;; FIXME: catch division by zero :(
 (define-gmp mpz_cdiv_q      (_fun _mpz _mpz _mpz -> _void))
 (define-gmp mpz_cdiv_r      (_fun _mpz _mpz _mpz -> _void))
 (define-gmp mpz_cdiv_qr     (_fun _mpz _mpz _mpz _mpz -> _void))
@@ -139,13 +142,13 @@
 (define-gmp mpz_divexact    (_fun _mpz _mpz _mpz -> _void))   ;; FIXME: check safety
 (define-gmp mpz_divexact_ui (_fun _mpz _mpz _ulong -> _void)) ;; FIXME: check safety
 
-(define-gmp mpz_divisible_p      (_fun _mpz _mpz -> _bool))
-(define-gmp mpz_divisible_ui_p   (_fun _mpz _ulong -> _bool))
-(define-gmp mpz_divisible_2exp_p (_fun _mpz _mp_bitcnt -> _bool))
+(define-gmp mpz_divisible_p      (_fun _mpz _mpz -> _int))
+(define-gmp mpz_divisible_ui_p   (_fun _mpz _ulong -> _int))
+(define-gmp mpz_divisible_2exp_p (_fun _mpz _mp_bitcnt -> _int))
 
-(define-gmp mpz_congruent_p      (_fun _mpz _mpz _mpz -> _bool))
-(define-gmp mpz_congruent_ui_p   (_fun _mpz _ulong _ulong -> _bool))
-(define-gmp mpz_congruent_2exp_p (_fun _mpz _mpz _mp_bitcnt -> _bool))
+(define-gmp mpz_congruent_p      (_fun _mpz _mpz _mpz -> _int))
+(define-gmp mpz_congruent_ui_p   (_fun _mpz _ulong _ulong -> _int))
+(define-gmp mpz_congruent_2exp_p (_fun _mpz _mpz _mp_bitcnt -> _int))
 
 ;; ----------------------------------------
 ;; Exponentiation
@@ -159,13 +162,13 @@
 ;; ----------------------------------------
 ;; Root Extraction
 
-(define-gmp mpz_root        (_fun _mpz _mpz _ulong -> _void))
+(define-gmp mpz_root        (_fun _mpz _mpz _ulong -> _int))
 (define-gmp mpz_rootrem     (_fun _mpz _mpz _mpz _ulong -> _void))
 (define-gmp mpz_sqrt        (_fun _mpz _mpz -> _void))
 (define-gmp mpz_sqrtrem     (_fun _mpz _mpz _mpz -> _void))
 
-(define-gmp mpz_perfect_power_p (_fun _mpz -> _bool))
-(define-gmp mpz_perfect_square_p (_fun _mpz -> _bool))
+(define-gmp mpz_perfect_power_p (_fun _mpz -> _int))
+(define-gmp mpz_perfect_square_p (_fun _mpz -> _int))
 
 ;; ----------------------------------------
 ;; Number Theoretic Functions
@@ -180,7 +183,7 @@
 (define-gmp mpz_lcm             (_fun _mpz _mpz _mpz -> _void))
 (define-gmp mpz_lcm_ui          (_fun _mpz _mpz _ulong -> _void))
 
-(define-gmp mpz_invert          (_fun _mpz _mpz _mpz -> _bool))
+(define-gmp mpz_invert          (_fun _mpz _mpz _mpz -> _int))
 
 (define-gmp mpz_jacobi          (_fun _mpz _mpz -> _int))
 (define-gmp mpz_legendre        (_fun _mpz _mpz -> _int))
@@ -194,8 +197,8 @@
 (define-gmp mpz_remove          (_fun _mpz _mpz _mpz -> _mp_bitcnt))
 
 (define-gmp mpz_fac_ui          (_fun _mpz _ulong -> _void))
-(define-gmp mpz_2fac_ui         (_fun _mpz _ulong -> _void))
-(define-gmp mpz_mfac_uiui       (_fun _mpz _ulong _ulong -> _void))
+(define-gmp mpz_2fac_ui         (_fun _mpz _ulong -> _void))          ;; buggy??
+(define-gmp mpz_mfac_uiui       (_fun _mpz _ulong _ulong -> _void))   ;; buggy??
 
 (define-gmp mpz_primordial_ui   (_fun _mpz _ulong -> _void))
 
@@ -223,7 +226,7 @@
 ;; mpz_sgn (macro)
 (define (mpz_sgn z)
   (unless (mpz? z) (raise-argument-error 'mpz_sgn "mpz?" 0 z))
-  (define zsize (mpz_struct-mp_size (cast z _mpz _mpz_struct-pointer)))
+  (define zsize (mpz_struct-mp_size z))
   (cond [(= zsize 0) 0] [(> zsize 0) 1] [else -1]))
 
 ;; ----------------------------------------
@@ -258,17 +261,22 @@
 ;; ----------------------------------------
 ;; Miscellaneous
 
-(define-gmp mpz_fits_ulong_p    (_fun _mpz -> _bool))
-(define-gmp mpz_fits_slong_p    (_fun _mpz -> _bool))
-(define-gmp mpz_fits_uint_p     (_fun _mpz -> _bool))
-(define-gmp mpz_fits_sint_p     (_fun _mpz -> _bool))
-(define-gmp mpz_fits_ushort_p   (_fun _mpz -> _bool))
-(define-gmp mpz_fits_sshort_p   (_fun _mpz -> _bool))
+(define-gmp mpz_fits_ulong_p    (_fun _mpz -> _int))
+(define-gmp mpz_fits_slong_p    (_fun _mpz -> _int))
+(define-gmp mpz_fits_uint_p     (_fun _mpz -> _int))
+(define-gmp mpz_fits_sint_p     (_fun _mpz -> _int))
+(define-gmp mpz_fits_ushort_p   (_fun _mpz -> _int))
+(define-gmp mpz_fits_sshort_p   (_fun _mpz -> _int))
 
-;; mpz_odd_p
-;; mpz_even_p
+(define (mpz_odd_p z)
+  (unless (mpz? z) (raise-argument-error 'mpz_odd_p "mpz?" 0 z))
+  (odd? (mpz_get_si z)))
 
-(define-gmp mpz_sizeinbase      (_fun _mpz _int -> _size))
+(define (mpz_even_p z)
+  (unless (mpz? z) (raise-argument-error 'mpz_even_p "mpz?" 0 z))
+  (even? (mpz_get_si z)))
+
+;; mpz_sizeinbase (in private/unsafe, needed for printing)
 
 ;; ============================================================
 ;; mpq
@@ -366,7 +374,7 @@
   (define zsize (mpz_struct-mp_size (mpq_struct-mp_num (cast q _mpq _mpq_struct-pointer))))
   (cond [(= zsize 0) 0] [(> zsize 0) 1] [else -1]))
 
-(define-gmp mpq_equal   (_fun _mpq _mpq -> _bool))
+(define-gmp mpq_equal   (_fun _mpq _mpq -> _int))
 
 ;; ----------------------------------------
 ;; Applying Integer Functions to Rationals

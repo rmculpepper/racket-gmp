@@ -1,5 +1,6 @@
 #lang racket/base
 (require (for-syntax racket/base racket/syntax)
+         racket/struct
          ffi/unsafe
          ffi/unsafe/define
          ffi/unsafe/alloc)
@@ -19,14 +20,27 @@
 (define-cstruct _mpz_struct
   ([mp_alloc _int]
    [mp_size  _int]
-   [mp_d     _pointer]))
+   [mp_d     _pointer])
+  #:malloc-mode 'atomic-interior
+  #:property prop:custom-write
+  (make-constructor-style-printer
+   (lambda (z) 'mpz)
+   (lambda (z) (list (*mpz->number z)))))
 
 (define-cstruct _mpq_struct
   ([mp_num   _mpz_struct]
-   [mp_den   _mpz_struct]))
+   [mp_den   _mpz_struct])
+  #:malloc-mode 'atomic-interior
+  #:property prop:custom-write
+  (make-constructor-style-printer
+   (lambda (q) 'mpq)
+   (lambda (q) (list (/ (*mpz->number (mpq_struct-mp_num q)) (*mpz->number (mpq_struct-mp_den q)))))))
 
-(define-cpointer-type _mpz _gcpointer)
-(define-cpointer-type _mpq _gcpointer)
+(define _mpz _mpz_struct-pointer)
+(define _mpq _mpq_struct-pointer)
+
+(define mpz? mpz_struct?)
+(define mpq? mpq_struct?)
 
 (define _mp_bitcnt _ulong)
 
@@ -40,6 +54,12 @@
   (_fun (z : _mpz) -> _void -> z)
   #:wrap (allocator mpz_clear))
 
+(define-gmp mpz_init2
+  (_fun (z : _mpz) _mp_bitcnt -> _void -> z)
+  #:wrap (allocator mpz_clear))
+
+(define-gmp mpz_realloc2      (_fun _mpz _mp_bitcnt -> _void))
+
 (define-gmp mpz_get_str (_fun _pointer _int _mpz -> _pointer))
 
 (define-gmp mpz_import
@@ -48,11 +68,12 @@
 (define-gmp mpz_export
   (_fun _pointer (count : (_ptr o _size)) _int _size _int _size _mpz -> _pointer -> count))
 
-(define-gmp mz_size         (_fun _mpz -> _size))
-(define-gmp mpz_limbs_read  (_fun _mpz -> _pointer))
-(define-gmp mpz_limbs_write (_fun _mpz _size -> _pointer))
-(define-gmp mpz_limbs_finish (_fun _mpz _size -> _void))
-(define-gmp mpz_realloc2    (_fun _mpz _mp_bitcnt -> _void))
+(define-gmp mpz_sizeinbase    (_fun _mpz _int -> _size))
+(define-gmp mpz_size          (_fun _mpz -> _size))
+
+(define-gmp mpz_limbs_read    (_fun _mpz -> _pointer))
+(define-gmp mpz_limbs_write   (_fun _mpz _size -> _pointer))
+(define-gmp mpz_limbs_finish  (_fun _mpz _size -> _void))
 
 ;; ---- Unsafe mpq functions ----
 
@@ -67,8 +88,13 @@
 ;; ============================================================
 ;; Other internals
 
-(define mpz-size (ctype-sizeof _mpz_struct))
-(define mpq-size (ctype-sizeof _mpq_struct))
+(define (alloc-mpz) (make-mpz_struct 0 0 #f))
+(define (alloc-mpq) (make-mpq_struct z0 z0))
+(define z0 (alloc-mpz)) ;; FIXME?
 
-(define (alloc-mpz) (cast (malloc mpz-size 'atomic-interior) _pointer _mpz))
-(define (alloc-mpq) (cast (malloc mpq-size 'atomic-interior) _pointer _mpq))
+(define (*mpz->number z)
+  (define len (+ (max 1 (mpz_sizeinbase z 16))
+                 (if (negative? (mpz_struct-mp_size z)) 1 0)))
+  (define buf (make-bytes len))
+  (mpz_get_str buf 16 z)
+  (string->number (bytes->string/latin-1 buf) 16))
