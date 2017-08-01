@@ -512,7 +512,8 @@
 ;; Applying Integer Functions to Rationals
 
 (define (mpq_numref q) (mpq_struct-mp_num q))
-(define (mpq_denref q) (mpq_struct-mp_den q)) ;; UNSAFE
+(define (mpq_denref q) (mpq_struct-mp_den q)) ;; unsafe; can be set to 0
+(provide (protect-out mpq_numref mpq_denref))
 
 (define-gmp mpq_get_num (_fun _mpz _mpq -> _void))
 (define-gmp mpq_get_den (_fun _mpz _mpq -> _void))
