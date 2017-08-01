@@ -157,6 +157,11 @@
 
 (define-gmp mp_bits_per_limb _int #:provide #:fail (* 8 (ctype-sizeof _ulong)))
 
+(define _mp_limb
+  (or (for/or ([t (list _uint16 _uint32 _uint64 _uintptr)])
+        (and (= mp_bits_per_limb (* 8 (ctype-sizeof t))) t))
+      _ulong))
+
 ;; ----------------------------------------
 ;; Initialization
 
@@ -408,7 +413,7 @@
 ;; ----------------------------------------
 ;; Special Functions
 
-;; mpz_getlimbn
+(define-gmp mpz_getlimbn      (_fun _mpz _mp_bitcnt -> _mp_limb))
 (define-gmp mpz_size          (_fun _mpz -> _size))
 (define-gmp mpz_limbs_read    (_fun _mpz -> _pointer)        #:unsafe)
 (define-gmp mpz_limbs_write   (_fun _mpz _size -> _pointer)  #:unsafe)

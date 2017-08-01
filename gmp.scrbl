@@ -4,7 +4,8 @@
           scribble/example
           racket/runtime-path
           racket/sandbox
-          (for-label racket racket/contract gmp))
+          (for-label racket racket/contract gmp
+                     (only-in ffi/unsafe [_long signed-long] [_ulong unsigned-long])))
 
 @title{GMP: Multi-precision Arithmetic}
 @author[@author+email["Ryan Culpepper" "ryanc@racket-lang.org"]]
@@ -12,11 +13,17 @@
 @(define(gmplink url-suffix . pre-flow)
    (apply hyperlink (format "https://gmplib.org/manual/~a" url-suffix) pre-flow))
 
-This library provides bindings to GMP, the GNU Multi-Precision
-Arithmetic library. This manual assumes familiarity with the relevant
-parts of @gmplink["index.html"]{the GMP manual}.
+This library provides safe low-level bindings to GMP, the GNU
+Multi-Precision Arithmetic library. This manual assumes familiarity
+with the relevant parts of @gmplink["index.html"]{the GMP manual}.
 
 @defmodule[gmp]
+
+This package is distributed under the
+@hyperlink["https://download.racket-lang.org/license.html"]{same
+license as Racket}.  Note that the GMP native library is dual-licensed
+under the LGPLv3 and the GPLv2 (see @gmplink["Copying.html"]{copying
+conditions} for details).
 
 @; ------------------------------------------------------------
 @section[#:tag "mpz"]{mpz: Multi-precision Integers}
@@ -66,8 +73,8 @@ arguments come first, followed by source operands.
 
 @deftogether[[
 @defproc[(mpz_set    [rop mpz?] [op mpz?]) void?]
-@defproc[(mpz_set_ui [rop mpz?] [op unsigned-long-integer?]) void?]
-@defproc[(mpz_set_si [rop mpz?] [op signed-long-integer?]) void?]
+@defproc[(mpz_set_ui [rop mpz?] [op unsigned-long]) void?]
+@defproc[(mpz_set_si [rop mpz?] [op signed-long]) void?]
 @defproc[(mpz_set_d  [rop mpz?] [op rational?]) void?]
 @defproc[(mpz_set_q  [rop mpz?] [op mpq?]) void?]
 @defproc[(mpz_set_str [rop mpz] [op string?]) void?]
@@ -249,6 +256,7 @@ See @gmplink["Miscellaneous-Functions.html"]{Miscellaneous Functions} in the GMP
 
 @deftogether[[
 @defproc[(mpz_size [op mpz?]) exact-nonnegative-integer?]
+@defproc[(mpz_getlimbn [op mpz?] [n unsigned-long]) exact-nonnegative-integer?]
 ]]{
 
 See @gmplink["Integer-Special-Functions.html"]{Special Functions} in the GMP manual.
