@@ -1,9 +1,6 @@
 #lang scribble/manual
 @(require scribble/manual
           scribble/basic
-          scribble/example
-          racket/runtime-path
-          racket/sandbox
           (for-label racket racket/contract gmp
                      (only-in ffi/unsafe [_long signed-long] [_ulong unsigned-long])))
 
