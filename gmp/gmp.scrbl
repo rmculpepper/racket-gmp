@@ -20,10 +20,9 @@ with the relevant parts of @gmplink["index.html"]{the GMP manual}.
 @defmodule[gmp]
 
 This package is distributed under the
-@hyperlink["https://download.racket-lang.org/license.html"]{same
-license as Racket}.  Note that the GMP native library is dual-licensed
-under the LGPLv3 and the GPLv2 (see @gmplink["Copying.html"]{copying
-conditions} for details).
+@hyperlink["https://www.gnu.org/licenses/lgpl.html"]{LGPL}.  Note
+that the GMP native library is dual-licensed under the LGPLv3 and the
+GPLv2 (see @gmplink["Copying.html"]{copying conditions} for details).
 
 @; ------------------------------------------------------------
 @section[#:tag "mpz"]{mpz: Multi-precision Integers}
