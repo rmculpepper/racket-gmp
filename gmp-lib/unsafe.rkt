@@ -1,6 +1,8 @@
 #lang racket/base
 (require "private/gmp.rkt")
 (provide _mpz
+         _mpq
+         _mp_bitcnt
          mpz_clear
          mpz_init
          mpz_init2
@@ -22,7 +24,6 @@
          mpz_limbs_write
          mpz_limbs_modify
          mpz_limbs_finish
-         _mpq
          mpq_clear
          mpq_init
          mpq_numref
