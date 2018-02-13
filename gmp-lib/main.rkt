@@ -9,7 +9,14 @@
           [mpz->number  (-> mpz? exact-integer?)]
           [mpz-zero?    (-> mpz? boolean?)]
           [mpz-positive? (-> mpz? boolean?)]
-          [mpz-negative? (-> mpz? boolean?)])
+          [mpz-negative? (-> mpz? boolean?)]
+          [mpz->bytes (->* [mpz? (or/c exact-positive-integer? #f) boolean?]
+                           [boolean? bytes? exact-nonnegative-integer?]
+                           bytes?)]
+          [mpz-bytes-length (-> mpz? boolean? exact-positive-integer?)]
+          [bytes->mpz (->* [bytes? boolean?]
+                           [boolean? exact-nonnegative-integer? exact-nonnegative-integer?]
+                           mpz?)])
 
          mpq?
          (contract-out

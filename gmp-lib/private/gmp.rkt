@@ -43,6 +43,9 @@
        #'(begin (define-gmp0 name type #:c-id cname option ...)
                 provide-clause))]))
 
+(define fixnum-fits-long?
+  (<= (ctype-sizeof _fixnum) (ctype-sizeof _long)))
+
 ;; ----------------------------------------
 
 (provide (protect-out
@@ -108,14 +111,19 @@
   z)
 
 (define (mpz-set! z n)
-  (define absn (abs n))
-  (for ([i (in-range (integer-length absn))])
-    (when (bitwise-bit-set? absn i) (mpz_setbit z i)))
-  (when (negative? n) (mpz_neg z z)))
+  (cond [(and (fixnum? n) fixnum-fits-long?)
+         (mpz_set_si z n)]
+        [else
+         (define absn (abs n))
+         (for ([i (in-range (integer-length absn))])
+           (when (bitwise-bit-set? absn i) (mpz_setbit z i)))
+         (when (negative? n) (mpz_neg z z))]))
 
 (define (mpz->number z)
-  ;; FIXME!!!
-  (string->number (mpz->string z 16) 16))
+  (cond [(mpz_fits_slong? z) (mpz_get_si z)]
+        [else
+         ;; FIXME!!!
+         (string->number (mpz->string z 16) 16)]))
 
 (define (mpz->string z [base 10])
   (define buf (make-bytes (+ (mpz_sizeinbase z base) (if (= (mpz_sgn z) -1) 1 0))))
@@ -150,7 +158,121 @@
 
 (define (mpz-bit-set? z i) (not (zero? (mpz_tstbit z i))))
 
-;; FIXME: mpz->bytes, bytes->mpz
+;; ----
+
+(provide (protect-out
+          mpz_export_base256
+          mpz_import_base256)
+         mpz-bytes-length
+         mpz->bytes
+         bytes->mpz)
+
+(define-gmp0 mpz_export_base256
+  (_fun (buf src big-endian?) ::
+        (buf : _pointer)      ;; pointer to chunk[]
+        (len : (_ptr o _size))
+        (order : _int = (if big-endian? 1 -1))  ;; (1 = most significant chunk first)
+        (size : _size = 1)  ;; sizeof(chunk)
+        (endian : _int = (if big-endian? 1 -1)) ;; (1 = most significant byte first in chunk)
+        (nails : _size = 0) ;; no unused bits per chunk
+        (src : _mpz)
+        -> _void
+        -> len)
+  #:c-id __gmpz_export)
+
+(define (mpz-bytes-length z signed?)
+  (cond [(mpz-negative? z)
+         (unless signed?
+           (error 'mpz-bytes-length "cannot convert negative mpz as unsigned\n  mpz: ~e" z))
+         (define pz (mpz z))
+         (mpz_add_ui pz pz 1)
+         (define size-in-bits (+ (mpz_sizeinbase pz 2) 1))
+         (quotient (+ size-in-bits 7) 8)]
+        [else
+         (define size-in-bits (+ (mpz_sizeinbase z 2) (if signed? 1 0)))
+         (quotient (+ size-in-bits 7) 8)]))
+
+(define (mpz->bytes z len signed? [big-endian? #t]
+                    [buf (and len (make-bytes len 0))] [start 0])
+  ;; len,buf may be #f meaning calculate shortest; if so, check-avail sets them
+  (define (check-avail needlen)
+    (cond [len
+           (unless (<= needlen len)
+             (error 'mpz->bytes
+                    "mpz does not fit into requested ~a bytes\n  mpz: ~e\n  requested bytes: ~e"
+                    (if signed? "signed" "unsigned") z len))]
+          [else
+           (set! len needlen)
+           (cond [buf (check-buf)]
+                 [else (set! buf (make-bytes needlen 0))])]))
+  (define (check-buf)
+    (define buflen (bytes-length buf))
+    (unless (>= buflen (+ start len))
+      (error 'mpz->bytes
+             (string-append "byte string length is shorter than starting position plus size"
+                            "\n  byte string length: ~s\n  start: ~s\n  size: ~s")
+             buflen start len)))
+  (when buf (check-buf))
+  ;; ----
+  (cond [(mpz-negative? z)
+         (unless signed?
+           (error 'mpz->bytes "cannot convert negative mpz as unsigned\n  mpz: ~e" z))
+         ;; need same number of bits as |z|-1, plus sign bit
+         (define pz (mpz z))
+         (mpz_add_ui pz pz 1)
+         (define size-in-bits (add1 (mpz_sizeinbase pz 2))) ;; add sign bit
+         (define size-in-bytes (quotient (+ size-in-bits 7) 8)) ;; = ceil(size-in-bits / 8)
+         (check-avail size-in-bytes)
+         (mpz_set_ui pz 1)
+         (mpz_mul_2exp pz pz (* len 8))
+         (mpz_add pz pz z)
+         (mpz_export_base256 (ptr-add buf start) pz big-endian?)]
+        [(mpz-zero? z)
+         ;; mpz_export produces zero bytes for (mpz 0), so simpler to handle separately
+         (check-avail 1)
+         (memset buf start 0 len)]
+        [else ;; positive
+         (define size-in-bits (mpz_sizeinbase z 2))
+         (define size-in-bytes (quotient (+ size-in-bits 7) 8)) ;; = ceil(size-in-bits / 8)
+         (define tight? (zero? (remainder size-in-bits 8)))
+         (check-avail (+ size-in-bytes (if (and signed? tight?) 1 0)))
+         (memset buf start 0 len)
+         ;; if big-endian, sign byte and extra space at front; if little-endian, at end
+         (define offset
+           (cond [big-endian? (- len size-in-bytes)]
+                 [else 0]))
+         (mpz_export_base256 (ptr-add buf (+ start offset)) z big-endian?)])
+  buf)
+
+(define-gmp0 mpz_import_base256
+  (_fun (dst count src big-endian?) ::
+        (dst : _mpz)
+        (count : _size)
+        (order : _int = (if big-endian? 1 -1))  ;; (1 = most significant chunk first)
+        (size : _size = 1)  ;; sizeof(chunk)
+        (endian : _int = (if big-endian? 1 -1)) ;; (1 = most significant byte first in chunk)
+        (nails : _size = 0) ;; no unused bits per chunk
+        (src : _pointer)    ;; pointer to chunk[count]
+        -> _void)
+  #:c-id __gmpz_import)
+
+(define (bytes->mpz buf signed? [big-endian? #t] [start 0] [end (bytes-length buf)])
+  (define buflen (bytes-length buf))
+  (define len (- end start))
+  (unless (<= 0 start buflen)
+    (raise-range-error 'bytes->mpz "byte string" "starting " start buf 0 buflen))
+  (unless (<= start end buflen)
+    (raise-range-error 'bytes->mpz "byte string" "ending " end buf 0 buflen start))
+  (when (zero? len)
+    (error 'bytes->mpz "byte string range is empty\n  start: ~e\n  end: ~e\n  byte string: ~e"
+           start end buf))
+  (define z (mpz))
+  (mpz_import_base256 z len (ptr-add buf start) big-endian?)
+  (when (and signed? (mpz-bit-set? z (sub1 (* len 8))))
+    (define pz (mpz 1))
+    (mpz_mul_2exp pz pz (* len 8))
+    (mpz_sub z z pz))
+  z)
 
 ;; ------------------------------------------------------------
 ;; FFI Functions and Constants
