@@ -64,6 +64,12 @@ Returns the integer value stored in @racket[z].
 Like @racket[zero?], @racket[positive?], and @racket[negative?], respectively.
 }
 
+@defproc[(mpz=? [z1 mpz?] [z2 mpz?]) boolean?]{
+
+Returns @racket[#t] if @racket[z1] and @racket[z2] contain equal
+integers, @racket[#f] otherwise.
+}
+
 @deftogether[[
 @defproc[(mpz->bytes [z mpz?] [size (or/c exact-positive-integer? #f)]
                      [signed? boolean?] [big-endian? boolean? #t]

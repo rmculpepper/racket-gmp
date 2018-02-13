@@ -11,6 +11,7 @@
           [mpz-zero?    (-> mpz? boolean?)]
           [mpz-positive? (-> mpz? boolean?)]
           [mpz-negative? (-> mpz? boolean?)]
+          [mpz=?         (-> mpz? mpz? boolean?)]
           [mpz->bytes (->* [mpz? (or/c exact-positive-integer? #f) boolean?]
                            [boolean? bytes? exact-nonnegative-integer?]
                            bytes?)]

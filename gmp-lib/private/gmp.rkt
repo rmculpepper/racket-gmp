@@ -99,7 +99,8 @@
          mpz->string
          mpz-zero?
          mpz-positive?
-         mpz-negative?)
+         mpz-negative?
+         mpz=?)
 
 (define mpz? mpz_struct?)
 
@@ -160,6 +161,7 @@
 (define (mpz-zero? z)     (zero? (mpz_struct-mp_size z)))
 (define (mpz-positive? z) (positive? (mpz_sgn z)))
 (define (mpz-negative? z) (negative? (mpz_sgn z)))
+(define (mpz=? z1 z2) (zero? (mpz_cmp z1 z2)))
 
 ;; ----
 
