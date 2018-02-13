@@ -2,7 +2,10 @@
 @(require scribble/manual
           scribble/basic
           (for-label racket racket/contract gmp
-                     (only-in ffi/unsafe [_long signed-long] [_ulong unsigned-long])))
+                     (only-in ffi/unsafe
+                              [_int signed-integer]
+                              [_long signed-long]
+                              [_ulong unsigned-long])))
 
 @title{GMP: Multi-precision Arithmetic}
 @author[@author+email["Ryan Culpepper" "ryanc@racket-lang.org"]]
@@ -35,11 +38,11 @@ Returns @racket[#t] if @racket[v] is an @tech{mpz} value, @racket[#f]
 otherwise.
 }
 
-@defproc[(mpz [n (or/c exact-integer? mpz?)]) mpz?]{
+@defproc[(mpz [n (or/c exact-integer? mpz?) 0]) mpz?]{
 
 Creates a new @tech{mpz} initialized with the value @racket[n]. If
 @racket[n] is an @tech{mpz}, then its value is copied; @racket[n] is
-unchanged does not share storage with the result.
+unchanged and does not share storage with the result.
 }
 
 @defproc[(mpz-set! [z mpz?] [n exact-integer?]) void?]{
@@ -59,6 +62,32 @@ Returns the integer value stored in @racket[z].
 ]]{
 
 Like @racket[zero?], @racket[positive?], and @racket[negative?], respectively.
+}
+
+@deftogether[[
+@defproc[(mpz->bytes [z mpz?] [size (or/c exact-positive-integer? #f)]
+                     [signed? boolean?] [big-endian? boolean? #t]
+                     [dest-buf bytes? (make-bytes size)] [dest-start 0])
+         bytes?]
+@defproc[(bytes->mpz [buf bytes?]
+                     [signed? boolean?] [big-endian? boolean? #t]
+                     [start exact-nonnegative-integer? 0]
+                     [end exact-nonnegative-integer? (bytes-length buf)])
+         mpz?]
+]]{
+
+Like @racket[integer->integer-bytes] and @racket[integer-bytes->integer],
+respectively. The @racket[size] argument to @racket[mpz->bytes] can be
+any positive integer (as long as it is large enough to represent
+@racket[z]), or it may be @racket[#f] to automatically use the
+shortest suitable size.
+}
+
+@defproc[(mpz-bytes-length [z mpz?] [signed? boolean?])
+         exact-positive-integer?]{
+
+Computes the number of bytes needed by @racket[mpz->bytes] to
+represent @racket[z].
 }
 
 @; ----------------------------------------
@@ -197,7 +226,7 @@ See @gmplink["Integer-Roots.html"]{Root Extraction Functions} in the GMP manual.
 @defproc[(mpz_fib2_ui     [fn mpz?] [fnsub1 mpz?] [n unsigned-long]) void?]
 @defproc[(mpz_lucnum_ui   [ln mpz?] [n unsigned-long]) void?]
 @defproc[(mpz_lucnum2_ui  [ln mpz?] [lnsub1 mpz?] [n unsigned-long]) void?]
-]]
+]]{
 
 See @gmplink["Number-Theoretic-Functions.html"]{Number Theoretic Functions} in the GMP manual.
 }
