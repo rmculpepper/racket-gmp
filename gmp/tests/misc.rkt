@@ -12,6 +12,7 @@
   (let ()
     (define z2 (mpz))
     (mpz-set! z2 n)
+    (check mpz=? z2 z)
     (check-equal? (mpz->number z2) n)
     (when (fixnum? n)
       (check-equal? (mpz_get_si z2) n)))

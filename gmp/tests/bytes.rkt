@@ -12,7 +12,9 @@
     (when len
       (define nb (integer->bytes n len signed? big-endian?))
       (check-equal? zb nb))
-    (check-equal? (mpz->number (bytes->mpz zb signed? big-endian?)) n)))
+    (define z2 (bytes->mpz zb signed? big-endian?))
+    (check mpz=? z2 z)
+    (check-equal? (mpz->number z2) n)))
 
 (define (rt2 n signed?) (rt n 2 signed?))
 
