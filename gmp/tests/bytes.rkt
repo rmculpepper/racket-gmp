@@ -1,7 +1,8 @@
 #lang racket/base
 (require rackunit
          binaryio/integer
-         gmp)
+         gmp
+         "util.rkt")
 
 (define (rt n len signed?)
   (define z (mpz n))
@@ -21,11 +22,6 @@
 (for-each (lambda (n) (rt2 n #f))
           '(0 1 127 128 255 256))
 
-(define (rnd signed? nbits)
-  (if signed?
-      (- (random (expt 2 nbits)) (expt 2 (sub1 nbits)))
-      (random (expt 2 nbits))))
-
 ;; random tests
 (for ([signed? '(#t #f)])
   (for ([i #e1e3])
@@ -33,8 +29,13 @@
 (for ([signed? '(#t #f)])
   (for ([i #e1e3])
     (rt (rnd signed? 24) 3 signed?)))
+
 (for ([signed? '(#t #f)])
-  (for ([nbits '(8 12 16 30)])
+  (for ([i #e5e2])
+    (rt (rnd signed? 8000) 1000 signed?)))
+
+(for ([signed? '(#t #f)])
+  (for ([nbits '(8 12 16 30 240)])
     (for ([i #e5e2])
       (rt (rnd signed? nbits) #f signed?))))
 
