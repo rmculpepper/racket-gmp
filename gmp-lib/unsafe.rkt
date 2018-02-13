@@ -3,6 +3,12 @@
 (provide _mpz
          _mpq
          _mp_bitcnt
+         _mpz_struct
+         _mpq_struct
+         mpz_struct-tag
+         mpq_struct-tag
+         (struct-out mpz_struct)
+         (struct-out mpq_struct)
          mpz_clear
          mpz_init
          mpz_init2

@@ -51,6 +51,8 @@
 (provide (protect-out
           (struct-out mpz_struct)
           (struct-out mpq_struct)
+          mpz_struct-tag
+          mpq_struct-tag
           _mpz_struct
           _mpq_struct
           _mpz
