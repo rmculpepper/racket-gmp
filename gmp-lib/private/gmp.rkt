@@ -113,17 +113,42 @@
 (define (mpz-set! z n)
   (cond [(and (fixnum? n) fixnum-fits-long?)
          (mpz_set_si z n)]
+        #|
+        [else ;; This is slow.
+         ;; For 800-bit and 8000-bit unsigned integers: 4-8x slower than string->number
+         (mpz_set_ui z 0)
+         ;; use 32-bit chunks
+         (define NBITS 32)
+         (define na (abs n))
+         (define len (integer-length na))
+         (mpz_realloc2 z len) ;; avoid repeated realloc
+         (define nchunks (quotient (+ len NBITS -1) NBITS))
+         (let loop ([i (sub1 nchunks)])
+           (when (i . >= . 0)
+             (mpz_mul_2exp z z NBITS)
+             (mpz_add_ui z z (bitwise-bit-field na (* i NBITS) (* (add1 i) NBITS)))
+             (loop (sub1 i))))
+         (when (negative? n) (mpz_neg z z))]
+        [else ;; This is really slow.
+         ;; For 800-bit and 8000-bit unsigned integers: 20-30x slower than string->number
+         (define na (abs n))
+         (define len (integer-length na))
+         (mpz_set_ui z 0)
+         (mpz_realloc2 z len)
+         (for ([i (in-range (add1 len))])
+           (when (bitwise-bit-set? na i) (mpz_setbit z i)))
+         (when (negative? n) (mpz_neg z z))]
+        |#
         [else
-         (define absn (abs n))
-         (for ([i (in-range (integer-length absn))])
-           (when (bitwise-bit-set? absn i) (mpz_setbit z i)))
-         (when (negative? n) (mpz_neg z z))]))
+         ;; It might seem silly to go through number->string, but it's actually
+         ;; *significantly* faster than the alternatives.
+         (or (zero? (mpz_set_str z (number->string n 16) 16))
+             (error 'mpz-set! "internal error: mpz_set_str failed\n  n: ~e" n))])
+  (void))
 
 (define (mpz->number z)
   (cond [(mpz_fits_slong? z) (mpz_get_si z)]
-        [else
-         ;; FIXME!!!
-         (string->number (mpz->string z 16) 16)]))
+        [else (string->number (mpz->string z 16) 16)]))
 
 (define (mpz->string z [base 10])
   (define buf (make-bytes (+ (mpz_sizeinbase z base) (if (= (mpz_sgn z) -1) 1 0))))
