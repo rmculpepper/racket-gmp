@@ -7,6 +7,7 @@
           [mpz          (->* [] [(or/c exact-integer? mpz?)] mpz?)]
           [mpz-set!     (-> mpz? exact-integer? void?)]
           [mpz->number  (-> mpz? exact-integer?)]
+          [mpz->string  (->* [mpz?] [exact-positive-integer?] string?)]
           [mpz-zero?    (-> mpz? boolean?)]
           [mpz-positive? (-> mpz? boolean?)]
           [mpz-negative? (-> mpz? boolean?)]

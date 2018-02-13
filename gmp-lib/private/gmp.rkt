@@ -128,7 +128,7 @@
 (define (mpz->string z [base 10])
   (define buf (make-bytes (+ (mpz_sizeinbase z base) (if (= (mpz_sgn z) -1) 1 0))))
   (mpz_get_str buf base z)
-  (bytes->string/latin-1 buf))
+  (cast buf _bytes _string/latin-1)) ;; handles NUL terminator
 
 (define (mpz-zero? z)     (zero? (mpz_struct-mp_size z)))
 (define (mpz-positive? z) (positive? (mpz_sgn z)))
