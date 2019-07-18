@@ -51,12 +51,16 @@
 (provide (protect-out
           (struct-out mpz_struct)
           (struct-out mpq_struct)
+          (struct-out gmp_randstate_struct)
           mpz_struct-tag
           mpq_struct-tag
+          gmp_randstate_struct-tag
           _mpz_struct
           _mpq_struct
+          _gmp_randstate_struct
           _mpz
           _mpq
+          _gmp_randstate
           _mp_bitcnt
           _ulong/NZ
           _mpz/NZ
@@ -88,6 +92,25 @@
 (define (_mpq/NZ who)
   (make-ctype _mpq (lambda (q) (if (mpq-zero? q) (error who "division by zero") q)) #f))
 
+(define (_mpz/pos who)
+  (make-ctype _mpz
+              (lambda (z)
+                (if (mpz-positive? z) z (error who "expected positive mpz\n  given: ~e" z)))
+              #f))
+
+(define (_ulong/pos who)
+  (make-ctype _ulong
+              (lambda (n)
+                (if (positive? n) n (error who "expected non-zero _ulong value\n  given: ~e" n)))
+              #f))
+
+(define-cstruct _gmp_randstate_struct
+  ([mp_seed _mpz_struct]
+   [mp_alg  _int #|gmp_randalg_t is enum|#]
+   [mp_algdata _pointer])
+  #:malloc-mode 'atomic-interior)
+
+(define _gmp_randstate _gmp_randstate_struct-pointer)
 
 ;; ============================================================
 ;; mpz
@@ -529,11 +552,9 @@
 ;; ----------------------------------------
 ;; Random Numbers
 
-;; (define-gmp mpz_urandomb (_fun _mpz _gmp_randstate _mp_bitcnt -> _void))
-;; (define-gmp mpz_urandomm (_fun _mpz _gmp_randstate _mpz -> _void) #:unsafe) ;; ??
-;; (define-gmp mpz_rrandomb (_fun _mpz _gmp_randstate _mp_bitcnt -> _void))
-;; mpz_random (deprecated)
-;; mpz_random2 (deprecated)
+(define-gmp mpz_urandomb (_fun _mpz _gmp_randstate _mp_bitcnt -> _void))
+(define-gmp mpz_urandomm (_fun _mpz _gmp_randstate (_mpz/pos 'mpz_urandomm) -> _void))
+(define-gmp mpz_rrandomb (_fun _mpz _gmp_randstate _mp_bitcnt -> _void))
 
 ;; ----------------------------------------
 ;; Import and Export
@@ -675,3 +696,64 @@
 (define-gmp mpq_get_den (_fun _mpz _mpq -> _void))
 (define-gmp mpq_set_num (_fun _mpq _mpz -> _void)) ;; non-canonical
 (define-gmp mpq_set_den (_fun _mpq (_mpz/NZ 'mpq_set_den) -> _void)) ;; non-canonical
+
+
+;; ============================================================
+;; random state
+
+(provide gmp-randstate?
+         gmp-randstate
+         gmp-randstate-mt
+         (protect-out
+          gmp_randinit_default
+          gmp_randinit_mt
+          gmp_randinit_lc_2exp
+          gmp_randinit_lc_2exp_size
+          gmp_randinit_set
+          gmp_randclear)
+         gmp_randseed
+         gmp_randseed_ui
+         gmp_urandomb_ui
+         gmp_urandomm_ui)
+
+(define gmp-randstate? gmp_randstate_struct?)
+
+(define (gmp-randstate)
+  (gmp_randinit_default (make-gmp_randstate_struct (mpz) 0 #f)))
+(define (gmp-randstate-mt)
+  (gmp_randinit_mt (make-gmp_randstate_struct (mpz) 0 #f)))
+
+(define-gmp0 gmp_randclear (_fun _gmp_randstate -> _void)
+  #:wrap (deallocator)
+  #:c-id __gmp_randclear)
+
+(define-gmp0 gmp_randinit_default
+  (_fun (rs : _gmp_randstate) -> _void -> rs)
+  #:wrap (allocator gmp_randclear)
+  #:c-id __gmp_randinit_default)
+(define-gmp0 gmp_randinit_mt
+  (_fun (rs : _gmp_randstate) -> _void -> rs)
+  #:wrap (allocator gmp_randclear)
+  #:c-id __gmp_randinit_mt)
+(define-gmp0 gmp_randinit_lc_2exp
+  (_fun (rs : _gmp_randstate) _mpz _ulong _mp_bitcnt -> _void -> rs)
+  #:wrap (allocator gmp_randclear)
+  #:c-id __gmp_randinit_lc_2exp)
+(define-gmp0 gmp_randinit_lc_2exp_size
+  (_fun (rs : _gmp_randstate) _mp_bitcnt -> _void -> rs)
+  #:wrap (allocator gmp_randclear)
+  #:c-id __gmp_randinit_lc_2exp_size)
+(define-gmp0 gmp_randinit_set
+  (_fun (rs : _gmp_randstate) _gmp_randstate -> _void -> rs)
+  #:wrap (allocator gmp_randclear)
+  #:c-id __gmp_randinit_set)
+
+(define-gmp0 gmp_randseed (_fun _gmp_randstate _mpz -> _void)
+  #:c-id __gmp_randseed)
+(define-gmp0 gmp_randseed_ui (_fun _gmp_randstate _ulong -> _void)
+  #:c-id __gmp_randseed_ui)
+
+(define-gmp0 gmp_urandomb_ui (_fun _gmp_randstate _ulong -> _ulong)
+  #:c-id __gmp_urandomb_ui)
+(define-gmp0 gmp_urandomm_ui (_fun _gmp_randstate (_ulong/pos 'gmp_urandomm_ui) -> _ulong)
+  #:c-id __gmp_urandomm_ui)

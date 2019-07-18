@@ -271,6 +271,18 @@ Manipulation Functions} in the GMP manual.
 }
 
 @deftogether[[
+@defproc[(mpz_urandomb [rop mpz?] [state gmp-randstate?] [n exact-nonnegative-integer?]) void?]
+@defproc[(mpz_urandomm [rop mpz?] [state gmp-randstate?] [n mpz?]) void?]
+@defproc[(mpz_rrandomb [rop mpz?] [state gmp-randstate?] [n exact-nonnegative-integer?]) void?]
+]]{
+
+See @gmplink["Integer-Random-Numbers.html"]{Integer Random Numbers} in the GMP manual.
+
+@history[#:added "1.2"]
+}
+
+
+@deftogether[[
 @defproc[(mpz_fits_ulong_p [op mpz?]) exact-integer?]
 @defproc[(mpz_fits_slong_p [op mpz?]) exact-integer?]
 @defproc[(mpz_fits_uint_p [op mpz?]) exact-integer?]
@@ -399,4 +411,56 @@ See @gmplink["Comparing-Rationals.html"]{Comparision Functions} in the GMP manua
 
 See @gmplink["Applying-Integer-Functions.html"]{Applying Integer
 Functions to Rationals} in the GMP manual.
+}
+
+@; ----------------------------------------
+@section[#:tag "mpq-ops"]{Random Number Generation}
+
+A @emph{randstate} (@tt{gmp_randstate_t}) represents a random number
+generation algorithm and its state. In this library, such values are
+recognized with @racket[gmp-randstate?] and created with
+@racket[gmp-randstate] and @racket[gmp-randstate-mt]. They are
+automatically initialized and garbage-collected.
+
+@defproc[(gmp-randstate? [v any/c]) boolean?]{
+
+Returns @racket[#t] if @racket[v] is a @tt{gmp_randstate_t} value,
+@racket[#f] otherwise.
+
+@history[#:added "1.2"]
+}
+
+@deftogether[[
+@defproc[(gmp-randstate) gmp-randstate?]
+@defproc[(gmp-randstate-mt) gmp-randstate?]
+]]{
+
+Returns a new @tt{gmp_randstate_t} initialized with
+@tt{gmp_randinit_default} or @tt{gmp_randinit_mt}, respectively.
+
+@history[#:added "1.2"]
+}
+
+@deftogether[[
+@defproc[(gmp_randseed [state gmp-randstate?] [seed mpz?]) void?]
+@defproc[(gmp_randseed_ui [state gmp-randstate?] [seed exact-nonnegative-integer?]) void?]
+]]{
+
+See @gmplink["Random-State-Seeding.html"]{Random State Seeding} in the
+GMP manual.
+
+@history[#:added "1.2"]
+}
+
+@deftogether[[
+@defproc[(gmp_urandomb_ui [state gmp-randstate?] [n exact-nonnegative-integer?])
+         exact-nonnegative-integer?]
+@defproc[(gmp_urandomm_ui [state gmp_randstate?] [n exact-positive-integer?])
+         exact-nonnegative-integer?]
+]]{
+
+See @gmplink["Random-State-Miscellaneous.html"]{Random State
+Miscellaneous} in the GMP manual.
+
+@history[#:added "1.2"]
 }

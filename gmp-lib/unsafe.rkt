@@ -5,10 +5,13 @@
          _mp_bitcnt
          _mpz_struct
          _mpq_struct
+         _gmp_randstate_struct
          mpz_struct-tag
          mpq_struct-tag
+         gmp_randstate_struct-tag
          (struct-out mpz_struct)
          (struct-out mpq_struct)
+         (struct-out gmp_randstate_struct)
          mpz_clear
          mpz_init
          mpz_init2
@@ -33,4 +36,10 @@
          mpq_clear
          mpq_init
          mpq_numref
-         mpq_denref)
+         mpq_denref
+         gmp_randinit_default
+         gmp_randinit_mt
+         gmp_randinit_lc_2exp
+         gmp_randinit_lc_2exp_size
+         gmp_randinit_set
+         gmp_randclear)

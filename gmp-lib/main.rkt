@@ -26,7 +26,12 @@
           [mpq->number  (-> mpq? (and/c rational? exact?))]
           [mpq-zero?    (-> mpq? boolean?)]
           [mpq-positive? (-> mpq? boolean?)]
-          [mpq-negative? (-> mpq? boolean?)]))
+          [mpq-negative? (-> mpq? boolean?)])
+
+         gmp-randstate?
+         (contract-out
+          [gmp-randstate (-> gmp-randstate?)]
+          [gmp-randstate-mt (-> gmp-randstate?)]))
 
 ;; ---- mpz ----
 (provide mp_bits_per_limb
@@ -160,9 +165,9 @@
          mpz_tstbit
          ;; -- Input and Output --
          ;; -- Random Numbers --
-         ;; mpz_urandomb
-         ;; mpz_urandomm
-         ;; mpz_rrandomb
+         mpz_urandomb
+         mpz_urandomm
+         mpz_rrandomb
          ;; -- Import and Export --
          ;; -- Miscellaneous --
          mpz_fits_ulong_p
@@ -216,3 +221,8 @@
          mpq_get_den
          mpq_set_num
          mpq_set_den)
+
+(provide gmp_randseed
+         gmp_randseed_ui
+         gmp_urandomb_ui
+         gmp_urandomm_ui)
