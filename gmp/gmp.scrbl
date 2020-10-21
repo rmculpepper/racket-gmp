@@ -414,7 +414,7 @@ Functions to Rationals} in the GMP manual.
 }
 
 @; ----------------------------------------
-@section[#:tag "mpq-ops"]{Random Number Generation}
+@section[#:tag "random"]{Random Number Generation}
 
 A @emph{randstate} (@tt{gmp_randstate_t}) represents a random number
 generation algorithm and its state. In this library, such values are
