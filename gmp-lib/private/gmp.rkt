@@ -177,7 +177,8 @@
         [else (string->number (mpz->string z 16) 16)]))
 
 (define (mpz->string z [base 10])
-  (define buf (make-bytes (+ (mpz_sizeinbase z base) (if (= (mpz_sgn z) -1) 1 0))))
+  ;; Racket CS bytes don't include NUL terminator, so include it in buf itself.
+  (define buf (make-bytes (+ 1 (mpz_sizeinbase z base) (if (= (mpz_sgn z) -1) 1 0))))
   (mpz_get_str buf base z)
   (cast buf _bytes _string/latin-1)) ;; handles NUL terminator
 
