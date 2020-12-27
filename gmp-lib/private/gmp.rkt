@@ -1,6 +1,7 @@
 #lang racket/base
 (require (for-syntax racket/base racket/syntax)
          racket/struct
+         racket/runtime-path
          ffi/unsafe
          ffi/unsafe/alloc
          ffi/unsafe/define)
@@ -25,7 +26,10 @@
 
 (provide (protect-out define-gmp0 define-gmp))
 
-(define-ffi-definer define-gmp0 (ffi-lib "libgmp" '(#f "10"))
+;; Cooperate with `raco distribute`:
+(define-runtime-path libgmp-so '(so "libgmp" ("10" #f)))
+
+(define-ffi-definer define-gmp0 (ffi-lib libgmp-so '("10" #f))
   #:default-make-fail make-not-available)
 
 (define-syntax (define-gmp stx)
